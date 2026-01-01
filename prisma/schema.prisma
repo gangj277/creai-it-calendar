@@ -1,0 +1,75 @@
+// CREAI+IT Operation Dashboard Schema
+// Supports hierarchical todos (sub-todos like Linear)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 마일스톤 - 중요 일정 (리크루팅, MT, 데모데이 등)
+model Milestone {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  eventType   String   // 'recruiting', 'interview', 'ot', 'mt', 'session', 'demo-day', etc.
+  color       String   @default("#14b8a6") // teal-500
+  todos       Todo[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([date])
+  @@index([eventType])
+}
+
+// 투두 상태
+enum TodoStatus {
+  TODO        // 할 일
+  IN_PROGRESS // 진행 중
+  DONE        // 완료
+  CANCELLED   // 취소됨
+}
+
+// 투두 우선순위
+enum TodoPriority {
+  URGENT   // 긴급
+  HIGH     // 높음
+  MEDIUM   // 보통
+  LOW      // 낮음
+}
+
+// 투두 - 계층 구조 지원 (sub-todo)
+model Todo {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TodoStatus   @default(TODO)
+  priority    TodoPriority @default(MEDIUM)
+  deadline    DateTime?
+  order       Int          @default(0) // 정렬 순서
+
+  // 마일스톤 연결
+  milestoneId String?
+  milestone   Milestone?   @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+
+  // 계층 구조 (self-referential)
+  parentId    String?
+  parent      Todo?        @relation("TodoHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Todo[]       @relation("TodoHierarchy")
+
+  // 타임스탬프
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([milestoneId])
+  @@index([parentId])
+  @@index([status])
+  @@index([deadline])
+  @@index([order])
+}
